@@ -1,0 +1,41 @@
+# Dependencies & Environment
+.venv/
+venv/
+node_modules/
+dist/
+build/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Secrets & Local User State
+.env
+.env.local
+*.pem
+*.key
+cookies.json
+~/.omnimcp/
+.omnimcp/
+
+# Build and Temp artifacts
+*.egg-info/
+.ruff_cache/
+# .agents/
+# .agent/
+# .gemini/
+# .gsd/
