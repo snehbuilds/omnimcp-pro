@@ -302,6 +302,60 @@ async def linkedin_scrape_profile(vanity_name: str) -> Dict[str, Any]:
     return await engine.scrape_person_profile(vanity_name=vanity_name)
 
 
+
+@mcp.tool()
+async def linkedin_official_post(
+    text: str,
+    image_path: Optional[str] = None,
+    visibility: str = "PUBLIC",
+    confirm_post: bool = False,
+) -> Dict[str, Any]:
+    """Publish a post using LinkedIn's Official Developer API (OAuth 2.0 + UGC Posts).
+
+    Uses https://api.linkedin.com/v2/ugcPosts and https://api.linkedin.com/v2/assets.
+    Requires LINKEDIN_ACCESS_TOKEN (w_member_social scope) in .env.
+    Supports both plain text and official image uploads!
+    """
+    if not confirm_post:
+        return {
+            "success": True,
+            "dry_run": True,
+            "text": text,
+            "image_path": image_path,
+            "visibility": visibility,
+            "notice": "Dry-run mode. Pass confirm_post=True to publish live via official API.",
+        }
+
+    from src.platforms.linkedin.official_client import OfficialLinkedInClient
+    client = OfficialLinkedInClient()
+    if not client.is_configured():
+        return {
+            "success": False,
+            "error": "LINKEDIN_ACCESS_TOKEN is not configured in .env. Set your OAuth 2.0 token to use the official API.",
+        }
+
+    if image_path:
+        success, post_id, post_url, elapsed, err = await client.upload_image_and_create_post(
+            text=text,
+            image_path=image_path,
+            visibility=visibility,
+        )
+    else:
+        success, post_id, post_url, elapsed, err = await client.create_official_text_post(
+            text=text,
+            visibility=visibility,
+        )
+
+    return {
+        "success": success,
+        "post_id": post_id,
+        "post_url": post_url,
+        "execution_time_ms": elapsed,
+        "method": "official_linkedin_oauth_ugc",
+        "error": err,
+    }
+
+
 def run_stdio_server():
     """Run FastMCP JSON-RPC server over stdio."""
     logger.info("Starting OmniMCP Pro stdio transport runner...")
