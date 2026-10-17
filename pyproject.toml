@@ -55,3 +55,7 @@ exclude = [
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
 ignore = ["E501"]
+
+
+[tool.uv.sources]
+mcp-server-linkedin = { path = "../mcps/linkedin-mcp-server", editable = true }

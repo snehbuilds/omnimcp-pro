@@ -1,7 +1,10 @@
 """FastMCP Protocol Server for OmniMCP Pro.
 
-Exposes high-speed, protocol-native social publishing, AI-slop auditing,
-calendar scheduling, and reach-learning tools to autonomous AI coding agents.
+Unified server combining:
+1. Complete LinkedIn MCP Suite (30 tools: profiles, company, jobs, feed, messaging, posts, comments, reactions).
+2. Omni Multi-Platform Engine (Cross-posting to X/Twitter, Threads, WordPress, Facebook).
+3. Strategy & Reach Learning (AI-Slop Radar, 20 Hook Formulas, 7-Day Calendar, Engagement Velocity Loop).
+4. Fast Sub-Second Voyager REST Tier (<500ms text posting & session checks).
 
 CRITICAL INVARIANT:
 - Never write logs or raw prints to stdout.
@@ -39,6 +42,37 @@ mcp = FastMCP(
     name="OmniMCP Pro",
 )
 
+# ==============================================================================
+# 1. Mount Complete LinkedIn MCP Server Tool Suites (Browser & Extractor)
+# ==============================================================================
+try:
+    from linkedin_mcp_server.tools.person import register_person_tools
+    from linkedin_mcp_server.tools.company import register_company_tools
+    from linkedin_mcp_server.tools.job import register_job_tools
+    from linkedin_mcp_server.tools.messaging import register_messaging_tools
+    from linkedin_mcp_server.tools.feed import register_feed_tools
+    from linkedin_mcp_server.tools.post import register_post_tools
+    from linkedin_mcp_server.tools.post_publishing import register_post_publishing_tools
+    from linkedin_mcp_server.tools.profile_edit import register_profile_edit_tools
+    from linkedin_mcp_server.tools.connection_removal import register_connection_removal_tools
+
+    register_person_tools(mcp)
+    register_company_tools(mcp)
+    register_job_tools(mcp)
+    register_messaging_tools(mcp)
+    register_feed_tools(mcp)
+    register_post_tools(mcp)
+    register_post_publishing_tools(mcp)
+    register_profile_edit_tools(mcp)
+    register_connection_removal_tools(mcp)
+    logger.info("Successfully mounted all LinkedIn MCP Server tool suites (30 tools)")
+except Exception as exc:
+    logger.warning("Failed to mount full linkedin_mcp_server tools: %s", exc)
+
+
+# ==============================================================================
+# 2. Omni Multi-Platform Tools (LinkedIn, Twitter/X, WordPress, Threads, Facebook)
+# ==============================================================================
 
 @mcp.tool()
 async def omni_broadcast_post(
@@ -183,10 +217,71 @@ def omni_record_reach_metrics(
 
 
 @mcp.tool()
+def omni_get_reach_recommendations() -> Dict[str, Any]:
+    """Analyze historical post performance to recommend winning hooks, categories, and optimal post timings."""
+    return global_content_scheduler.get_reach_analytics()
+
+
+@mcp.tool()
 def omni_get_safety_status(platform: str = "linkedin") -> Dict[str, Any]:
     """Get live cooldown countdown, daily limits, and Write Gate authorization status."""
     status = global_safety_guard.get_status(platform)
     return status.__dict__
+
+
+# ==============================================================================
+# 3. High-Speed Sub-Second Voyager REST Tools (Fast Tier)
+# ==============================================================================
+
+@mcp.tool()
+async def linkedin_fast_auth_check() -> Dict[str, Any]:
+    """Sub-second (<300ms) LinkedIn identity and session validity check via Voyager REST /api/me."""
+    adapter = global_adapter_registry.get("linkedin")
+    if not adapter:
+        return {"authenticated": False, "error": "LinkedIn adapter not loaded"}
+    return await adapter.verify_auth()
+
+
+@mcp.tool()
+async def linkedin_fast_text_post(
+    text: str,
+    visibility: str = "PUBLIC",
+    first_comment: Optional[str] = None,
+    confirm_post: bool = False,
+) -> Dict[str, Any]:
+    """Sub-second (~400ms) text post directly via LinkedIn's Flagship Voyager REST API.
+
+    Bypasses browser launch overhead for instant publishing when no media is attached.
+    """
+    if not confirm_post:
+        return {
+            "success": True,
+            "dry_run": True,
+            "text": text,
+            "visibility": visibility,
+            "first_comment": first_comment,
+            "notice": "Dry-run mode. Pass confirm_post=True to publish live.",
+        }
+
+    from src.platforms.linkedin.rest_client import LinkedInRestClient
+    client = LinkedInRestClient()
+    success, act_urn, post_url, elapsed, err = await client.create_text_post(text, visibility=visibility)
+    
+    comment_urn = None
+    if success and act_urn and first_comment:
+        c_ok, c_urn, _ = await client.create_comment(act_urn, first_comment)
+        if c_ok:
+            comment_urn = c_urn
+
+    return {
+        "success": success,
+        "activity_urn": act_urn,
+        "post_url": post_url,
+        "first_comment_urn": comment_urn,
+        "execution_time_ms": elapsed,
+        "error": err,
+    }
+
 
 
 @mcp.tool()
@@ -200,7 +295,7 @@ async def linkedin_check_session() -> Dict[str, Any]:
 
 @mcp.tool()
 async def linkedin_scrape_profile(vanity_name: str) -> Dict[str, Any]:
-    """Scrape public/connected profile sections (headline, about) via Patchright stealth browser."""
+    """Scrape public/connected profile sections via Patchright stealth browser."""
     from src.platforms.linkedin.browser_engine import LinkedInBrowserEngine
 
     engine = LinkedInBrowserEngine()
