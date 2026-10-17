@@ -45,7 +45,7 @@ class LinkedInBrowserEngine:
                 {
                     "name": "li_at",
                     "value": session.li_at,
-                    "domain": ".www.linkedin.com",
+                    "domain": ".linkedin.com",
                     "path": "/",
                     "httpOnly": True,
                     "secure": True,
@@ -53,7 +53,7 @@ class LinkedInBrowserEngine:
                 {
                     "name": "JSESSIONID",
                     "value": session.jsessionid,
-                    "domain": ".www.linkedin.com",
+                    "domain": ".linkedin.com",
                     "path": "/",
                     "httpOnly": False,
                     "secure": True,
