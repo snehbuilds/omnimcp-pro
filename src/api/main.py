@@ -294,6 +294,73 @@ async def sse_event_stream(request: Request):
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
+
+from fastapi.responses import HTMLResponse, RedirectResponse
+from src.auth.oauth_helper import LinkedInOAuthHelper
+
+oauth_helper = LinkedInOAuthHelper(session_store)
+
+
+@app.get("/api/auth/linkedin/oauth/url")
+def get_linkedin_oauth_url(client_id: Optional[str] = None, redirect_uri: Optional[str] = None):
+    try:
+        url = oauth_helper.get_authorization_url(client_id=client_id, redirect_uri=redirect_uri)
+        return {"success": True, "auth_url": url}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/auth/linkedin/callback", response_class=HTMLResponse)
+async def linkedin_oauth_callback(
+    code: Optional[str] = None,
+    error: Optional[str] = None,
+    error_description: Optional[str] = None,
+):
+    if error:
+        return HTMLResponse(
+            content=f"""
+            <html><body style="font-family: sans-serif; background: #090a0f; color: #f43f5e; padding: 40px; text-align: center;">
+                <h2>❌ LinkedIn OAuth Authorization Failed</h2>
+                <p>{error}: {error_description}</p>
+                <br/>
+                <a href="/" style="color: #38bdf8;">Return to Command Center</a>
+            </body></html>
+            """,
+            status_code=400,
+        )
+
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing authorization code parameter")
+
+    result = await oauth_helper.exchange_code_for_token(code=code)
+    if result.get("success"):
+        return HTMLResponse(
+            content="""
+            <html><body style="font-family: sans-serif; background: #090a0f; color: #f8fafc; padding: 40px; text-align: center;">
+                <div style="max-width: 500px; margin: 40px auto; background: #121520; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 30px;">
+                    <h2 style="color: #10b981; margin-top: 0;">✅ LinkedIn Official OAuth Connected!</h2>
+                    <p style="color: #94a3b8;">Your official OAuth 2.0 access token has been acquired and saved to .env.</p>
+                    <p style="color: #64748b; font-size: 13px;">Scopes: openid, profile, email, w_member_social</p>
+                    <br/>
+                    <a href="/" style="display: inline-block; background: #38bdf8; color: #090a0f; padding: 10px 24px; border-radius: 6px; font-weight: 600; text-decoration: none;">Return to Command Center</a>
+                </div>
+            </body></html>
+            """
+        )
+
+    return HTMLResponse(
+        content=f"""
+        <html><body style="font-family: sans-serif; background: #090a0f; color: #f43f5e; padding: 40px; text-align: center;">
+            <h2>❌ Token Exchange Failed</h2>
+            <p>{result.get('error')}</p>
+            <br/>
+            <a href="/" style="color: #38bdf8;">Return to Command Center</a>
+        </body></html>
+        """,
+        status_code=400,
+    )
+
+
 # Mount static frontend build if present
 dist_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 if dist_dir.exists():

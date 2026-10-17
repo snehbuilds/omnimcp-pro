@@ -141,6 +141,55 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </form>
       </div>
 
+      
+      {/* Official LinkedIn Developer App (OAuth 2.0) */}
+      <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--accent-cyan)' }}>
+            Official LinkedIn Developer App (OAuth 2.0)
+          </h3>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+            Compliant with Microsoft Learn / LinkedIn Consumer Solutions Platform. Provides official UGC post publishing and media assets upload.
+          </p>
+        </div>
+
+        <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', marginBottom: '16px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+            <strong style={{ color: 'var(--text-primary)' }}>Setup Steps on LinkedIn Developer Portal:</strong><br/>
+            1. Create an app on <a href="https://www.linkedin.com/developers/apps" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-cyan)' }}>linkedin.com/developers/apps</a><br/>
+            2. Under <strong>Products</strong>, add <strong>Sign In with LinkedIn using OpenID Connect</strong> and <strong>Share on LinkedIn</strong>.<br/>
+            3. Under <strong>Auth</strong>, add Authorized Redirect URL: <code style={{ color: 'var(--accent-green)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px' }}>http://localhost:8000/api/auth/linkedin/callback</code><br/>
+            4. Click the button below to authorize and auto-save your <code>LINKEDIN_ACCESS_TOKEN</code>!
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={async () => {
+              try {
+                const res = await fetch('/api/auth/linkedin/oauth/url');
+                const data = await res.json();
+                if (data.auth_url) {
+                  window.location.href = data.auth_url;
+                } else {
+                  alert(data.detail || 'Please configure LINKEDIN_CLIENT_ID in your .env first.');
+                }
+              } catch (e) {
+                alert('Could not reach backend OAuth endpoint: ' + e);
+              }
+            }}
+          >
+            Connect via Official LinkedIn OAuth
+          </button>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            Grants: openid, profile, email, w_member_social
+          </span>
+        </div>
+      </div>
+
+
       {/* Connected Platforms Health */}
       <div className="glass-panel" style={{ padding: '24px' }}>
         <h3 style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'var(--font-display)', marginBottom: '14px' }}>
