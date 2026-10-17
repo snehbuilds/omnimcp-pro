@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { HeaderHUD } from './components/HeaderHUD';
+import { PenLine } from 'lucide-react';
+import { AppNavigation, TabId } from './components/AppNavigation';
+import { PageHeader, useToast } from './components/ui';
 import { OmniComposer } from './components/OmniComposer';
 import { PlatformPreview } from './components/PlatformPreview';
 import { CalendarView } from './components/CalendarView';
@@ -15,7 +17,25 @@ import {
 } from './types';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'composer' | 'calendar' | 'analytics' | 'settings'>('composer');
+  const [activeTab, setActiveTab] = useState<TabId>('composer');
+  const toast = useToast();
+
+  useEffect(() => {
+    const tabs: TabId[] = ['composer', 'calendar', 'analytics', 'settings'];
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement;
+      if (target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return;
+      const idx = Number(e.key) - 1;
+      if (idx >= 0 && idx < tabs.length) setActiveTab(tabs[idx]);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [activeTab]);
 
   // Composer state
   const [text, setText] = useState<string>(
@@ -205,7 +225,7 @@ export const App: React.FC = () => {
       fetchSafety();
       setActiveTab('composer');
     } catch (e) {
-      alert(`Publish failed: ${e}`);
+      toast(`Publish failed: ${e}`, 'error');
     } finally {
       setIsPublishing(false);
     }
@@ -226,9 +246,12 @@ export const App: React.FC = () => {
       if (res.ok) {
         fetchAnalytics();
         fetchCalendar();
+        toast('Reach metrics recorded. Leaderboard updated.', 'ok');
+      } else {
+        toast('Could not record metrics.', 'error');
       }
     } catch (e) {
-      alert(`Failed to record metrics: ${e}`);
+      toast(`Failed to record metrics: ${e}`, 'error');
     }
   };
 
@@ -238,13 +261,13 @@ export const App: React.FC = () => {
       const res = await fetch('/api/auth/cookies/refresh-chrome', { method: 'POST' });
       const data = await res.json();
       if (data.status === 'success') {
-        alert('LinkedIn cookies refreshed successfully from Chrome!');
+        toast('LinkedIn session synced from Chrome.', 'ok');
         fetchPlatforms();
       } else {
-        alert(`Chrome sync: ${data.error || 'Failed to extract session cookies.'}`);
+        toast(`Chrome sync: ${data.error || 'Failed to extract session cookies.'}`, 'error');
       }
     } catch (e) {
-      alert(`Error syncing Chrome cookies: ${e}`);
+      toast(`Error syncing Chrome cookies: ${e}`, 'error');
     } finally {
       setIsRefreshingCookies(false);
     }
@@ -261,13 +284,13 @@ export const App: React.FC = () => {
         fetchPlatforms();
       }
     } catch (e) {
-      alert(`Failed to save cookies: ${e}`);
+      toast(`Failed to save cookies: ${e}`, 'error');
     }
   };
 
   return (
-    <div className="app-container">
-      <HeaderHUD
+    <div className="shell">
+      <AppNavigation
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         safety={safety}
@@ -276,9 +299,20 @@ export const App: React.FC = () => {
         isRefreshing={isRefreshingCookies}
       />
 
-      <main className="main-content">
+      <main className="main">
+        <div className="main-inner">
         {activeTab === 'composer' && (
-          <div className="composer-grid">
+          <>
+          <PageHeader
+            eyebrow={
+              <>
+                <PenLine size={13} aria-hidden="true" /> Omni-channel
+              </>
+            }
+            title="Compose once, publish everywhere"
+            description="Write a single master update. OmniMCP adapts it to every network, audits tone, and guards your accounts."
+          />
+          <div className="composer-layout">
             <OmniComposer
               text={text}
               setText={setText}
@@ -301,6 +335,7 @@ export const App: React.FC = () => {
               mediaPaths={mediaPaths}
             />
           </div>
+          </>
         )}
 
         {activeTab === 'calendar' && (
@@ -334,6 +369,7 @@ export const App: React.FC = () => {
             isRefreshing={isRefreshingCookies}
           />
         )}
+        </div>
       </main>
     </div>
   );

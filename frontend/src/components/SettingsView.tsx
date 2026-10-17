@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { CircleCheck, Cookie, ExternalLink, KeyRound, Lock, Plug, RefreshCw, ShieldCheck } from 'lucide-react';
 import { PlatformStatus, SafetyStatus } from '../types';
+import { PageHeader, PlatformGlyph, useToast } from './ui';
 
 interface SettingsViewProps {
   safety: SafetyStatus | null;
@@ -16,9 +18,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onRefreshFromChrome,
   isRefreshing,
 }) => {
+  const toast = useToast();
   const [liAt, setLiAt] = useState('');
   const [jsessionId, setJsessionId] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,213 +32,228 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
+  const handleOAuth = async () => {
+    setIsConnecting(true);
+    try {
+      const res = await fetch('/api/auth/linkedin/oauth/url');
+      const data = await res.json();
+      if (data.auth_url) {
+        window.location.href = data.auth_url;
+        return;
+      }
+      toast(data.detail || 'Configure LINKEDIN_CLIENT_ID in your .env first.', 'error');
+    } catch (e) {
+      toast(`Could not reach backend OAuth endpoint: ${e}`, 'error');
+    }
+    setIsConnecting(false);
+  };
+
+  const platformEntries = Object.entries(platforms);
+
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-      <h2 style={{ fontSize: '22px', fontWeight: 700, fontFamily: 'var(--font-display)', marginBottom: '8px' }}>
-        Safety & Credential Control Center
-      </h2>
-      <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '24px' }}>
-        Local-first credential isolation: Session tokens never leave your local environment and are stored securely in ~/.omnimcp/.
-      </p>
+    <>
+      <PageHeader
+        eyebrow={
+          <>
+            <Lock size={13} aria-hidden="true" /> Local-first
+          </>
+        }
+        title="Safety & sessions"
+        description="Session tokens never leave your machine. Everything is stored in ~/.omnimcp/."
+      />
 
-      {/* Safety Guard Status Card */}
-      <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px' }}>
-        <h3 style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'var(--font-display)', marginBottom: '14px' }}>
-          Strict Anti-Ban Guard
-        </h3>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-          <div style={{ background: 'var(--bg-secondary)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>MANDATORY COOLDOWN</div>
-            <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent-purple)', marginTop: '4px' }}>
-              {safety?.cooldown_seconds || 180}s ({safety?.cooldown_remaining_seconds || 0}s left)
+      <div className="settings-stack">
+        <section className="card" aria-labelledby="guard-title">
+          <div className="card-header">
+            <div>
+              <h2 id="guard-title" className="card-title">
+                <ShieldCheck size={16} aria-hidden="true" />
+                Anti-ban guard
+              </h2>
+              <p className="card-subtitle">Hard limits enforced on every live write.</p>
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              {safety?.is_on_cooldown ? 'Active cooldown in progress' : 'Ready to post'}
-            </div>
-          </div>
-
-          <div style={{ background: 'var(--bg-secondary)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>DAILY FREQUENCY CAP</div>
-            <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent-cyan)', marginTop: '4px' }}>
-              {safety ? `${safety.posts_today} / ${safety.daily_limit}` : '0 / 6'} Posts
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+            <span className={`badge ${safety?.write_enabled_in_env ? 'badge-ok' : 'badge-warn'}`}>
               {safety?.write_enabled_in_env ? 'Live mutations enabled' : 'Preview mode only'}
+            </span>
+          </div>
+          <div className="metric-grid">
+            <div>
+              <div className="stat-label">Mandatory cooldown</div>
+              <div className="metric-value">
+                {safety?.cooldown_seconds ?? 180}s
+                <span className="muted mono" style={{ fontSize: 12, fontWeight: 400, marginLeft: 8 }}>
+                  {safety?.cooldown_remaining_seconds ?? 0}s left
+                </span>
+              </div>
+              <div className="hint" style={{ marginTop: 2 }}>
+                {safety?.is_on_cooldown ? 'Cooldown in progress' : 'Ready to post'}
+              </div>
+            </div>
+            <div>
+              <div className="stat-label">Daily frequency cap</div>
+              <div className="metric-value">
+                {safety ? `${safety.posts_today} / ${safety.daily_limit}` : '0 / 6'}
+              </div>
+              <div className="hint" style={{ marginTop: 2 }}>
+                Posts today
+              </div>
+            </div>
+            <div>
+              <div className="stat-label">Human jitter delay</div>
+              <div className="metric-value">1.5–3.5s</div>
+              <div className="hint" style={{ marginTop: 2 }}>
+                Randomized typing interval
+              </div>
             </div>
           </div>
+        </section>
 
-          <div style={{ background: 'var(--bg-secondary)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>HUMAN JITTER DELAY</div>
-            <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent-green)', marginTop: '4px' }}>
-              1.5s – 3.5s
+        <section className="card" aria-labelledby="cookies-title">
+          <div className="card-header">
+            <div>
+              <h2 id="cookies-title" className="card-title">
+                <Cookie size={16} aria-hidden="true" />
+                LinkedIn session cookies
+              </h2>
+              <p className="card-subtitle">Powers the sub-500ms Voyager REST API and Patchright automation.</p>
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              Randomized typing interval
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* LinkedIn Session Cookies Management */}
-      <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <div>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'var(--font-display)' }}>
-              LinkedIn Session Cookies (li_at & JSESSIONID)
-            </h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-              Required for sub-500ms Voyager REST API and Patchright browser automation.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={onRefreshFromChrome}
-            disabled={isRefreshing}
-          >
-            {isRefreshing ? 'Extracting...' : 'Auto-Sync from Chrome'}
-          </button>
-        </div>
-
-        <form onSubmit={handleSave}>
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
-              li_at Cookie:
-            </label>
-            <input
-              type="password"
-              className="composer-textarea"
-              style={{ minHeight: 'auto', padding: '10px', fontSize: '13px', fontFamily: 'var(--font-mono)' }}
-              placeholder="AQED... (paste li_at cookie here)"
-              value={liAt}
-              onChange={(e) => setLiAt(e.target.value)}
-            />
-          </div>
-
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
-              JSESSIONID Cookie (or csrf-token):
-            </label>
-            <input
-              type="password"
-              className="composer-textarea"
-              style={{ minHeight: 'auto', padding: '10px', fontSize: '13px', fontFamily: 'var(--font-mono)' }}
-              placeholder='"ajax:..." (paste JSESSIONID here)'
-              value={jsessionId}
-              onChange={(e) => setJsessionId(e.target.value)}
-            />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            {savedSuccess ? (
-              <span style={{ fontSize: '12px', color: 'var(--accent-green)', fontWeight: 600 }}>
-                ✓ Cookies saved to ~/.omnimcp/cookies.json
-              </span>
-            ) : <span />}
-
-            <button type="submit" className="btn-primary" disabled={!liAt || !jsessionId}>
-              Save Session Cookies
+            <button type="button" className="btn btn-secondary btn-sm" onClick={onRefreshFromChrome} disabled={isRefreshing}>
+              <RefreshCw size={14} className={isRefreshing ? 'spin' : ''} aria-hidden="true" />
+              {isRefreshing ? 'Extracting…' : 'Auto-sync from Chrome'}
             </button>
           </div>
-        </form>
-      </div>
-
-      
-      {/* Official LinkedIn Developer App (OAuth 2.0) */}
-      <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px' }}>
-        <div style={{ marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--accent-cyan)' }}>
-            Official LinkedIn Developer App (OAuth 2.0)
-          </h3>
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Compliant with Microsoft Learn / LinkedIn Consumer Solutions Platform. Provides official UGC post publishing and media assets upload.
-          </p>
-        </div>
-
-        <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', marginBottom: '16px' }}>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-            <strong style={{ color: 'var(--text-primary)' }}>Setup Steps on LinkedIn Developer Portal:</strong><br/>
-            1. Create an app on <a href="https://www.linkedin.com/developers/apps" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-cyan)' }}>linkedin.com/developers/apps</a><br/>
-            2. Under <strong>Products</strong>, add <strong>Sign In with LinkedIn using OpenID Connect</strong> and <strong>Share on LinkedIn</strong>.<br/>
-            3. Under <strong>Auth</strong>, add Authorized Redirect URL: <code style={{ color: 'var(--accent-green)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px' }}>http://localhost:8000/api/auth/linkedin/callback</code><br/>
-            4. Click the button below to authorize and auto-save your <code>LINKEDIN_ACCESS_TOKEN</code>!
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={async () => {
-              try {
-                const res = await fetch('/api/auth/linkedin/oauth/url');
-                const data = await res.json();
-                if (data.auth_url) {
-                  window.location.href = data.auth_url;
-                } else {
-                  alert(data.detail || 'Please configure LINKEDIN_CLIENT_ID in your .env first.');
-                }
-              } catch (e) {
-                alert('Could not reach backend OAuth endpoint: ' + e);
-              }
-            }}
-          >
-            Connect via Official LinkedIn OAuth
-          </button>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            Grants: openid, profile, email, w_member_social
-          </span>
-        </div>
-      </div>
-
-
-      {/* Connected Platforms Health */}
-      <div className="glass-panel" style={{ padding: '24px' }}>
-        <h3 style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'var(--font-display)', marginBottom: '14px' }}>
-          Platform Adapter Status
-        </h3>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {Object.entries(platforms).map(([key, p]) => (
-            <div
-              key={key}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '10px 14px',
-                background: 'var(--bg-secondary)',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border-subtle)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span className={`pulse-dot ${p.configured ? 'pulse-green' : 'pulse-amber'}`} />
-                <span style={{ fontWeight: 600, fontSize: '13px', textTransform: 'capitalize' }}>
-                  {p.name}
-                </span>
-                {p.auth_info?.name && (
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    ({p.auth_info.name})
-                  </span>
-                )}
+          <form onSubmit={handleSave}>
+            <div className="card-body form-grid cols-2">
+              <div className="field">
+                <label htmlFor="li-at" className="label">
+                  li_at
+                </label>
+                <input
+                  id="li-at"
+                  type="password"
+                  autoComplete="off"
+                  className="input input-mono"
+                  placeholder="AQED…"
+                  value={liAt}
+                  onChange={(e) => setLiAt(e.target.value)}
+                />
               </div>
-
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: p.configured ? 'var(--accent-green)' : 'var(--text-muted)',
-                }}
-              >
-                {p.configured ? 'Configured & Ready' : 'Optional (Add to .env)'}
-              </span>
+              <div className="field">
+                <label htmlFor="jsessionid" className="label">
+                  JSESSIONID / csrf-token
+                </label>
+                <input
+                  id="jsessionid"
+                  type="password"
+                  autoComplete="off"
+                  className="input input-mono"
+                  placeholder='"ajax:…"'
+                  value={jsessionId}
+                  onChange={(e) => setJsessionId(e.target.value)}
+                />
+              </div>
             </div>
-          ))}
-        </div>
+            <div className="card-footer">
+              <span className="hint" role="status">
+                {savedSuccess ? (
+                  <span className="row text-ok">
+                    <CircleCheck size={14} aria-hidden="true" /> Saved to ~/.omnimcp/cookies.json
+                  </span>
+                ) : (
+                  'Stored locally and encrypted at rest.'
+                )}
+              </span>
+              <button type="submit" className="btn btn-primary" disabled={!liAt || !jsessionId}>
+                Save cookies
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="card" aria-labelledby="oauth-title">
+          <div className="card-header">
+            <div>
+              <h2 id="oauth-title" className="card-title">
+                <KeyRound size={16} aria-hidden="true" />
+                Official LinkedIn app (OAuth 2.0)
+              </h2>
+              <p className="card-subtitle">Compliant UGC publishing and media uploads via the Consumer Solutions Platform.</p>
+            </div>
+          </div>
+          <div className="card-body">
+            <ol className="steps">
+              <li>
+                <span>
+                  Create an app at{' '}
+                  <a className="text-link" href="https://www.linkedin.com/developers/apps" target="_blank" rel="noreferrer">
+                    linkedin.com/developers/apps
+                    <ExternalLink size={11} style={{ marginLeft: 3, verticalAlign: 'baseline' }} aria-hidden="true" />
+                  </a>
+                </span>
+              </li>
+              <li>
+                <span>
+                  Under <strong>Products</strong>, add <strong>Sign In with LinkedIn using OpenID Connect</strong> and{' '}
+                  <strong>Share on LinkedIn</strong>.
+                </span>
+              </li>
+              <li>
+                <span>
+                  Under <strong>Auth</strong>, add the redirect URL{' '}
+                  <code className="code">http://localhost:8000/api/auth/linkedin/callback</code>
+                </span>
+              </li>
+              <li>
+                <span>
+                  Authorize below to auto-save your <code className="code">LINKEDIN_ACCESS_TOKEN</code>.
+                </span>
+              </li>
+            </ol>
+          </div>
+          <div className="card-footer">
+            <span className="hint mono">openid · profile · email · w_member_social</span>
+            <button type="button" className="btn btn-primary" onClick={handleOAuth} disabled={isConnecting}>
+              <PlatformGlyph id="linkedin" />
+              {isConnecting ? 'Redirecting…' : 'Connect with LinkedIn'}
+            </button>
+          </div>
+        </section>
+
+        <section className="card" aria-labelledby="adapters-title">
+          <div className="card-header">
+            <div>
+              <h2 id="adapters-title" className="card-title">
+                <Plug size={16} aria-hidden="true" />
+                Platform adapters
+              </h2>
+              <p className="card-subtitle">Connection health for every channel.</p>
+            </div>
+          </div>
+          {platformEntries.length === 0 ? (
+            <div className="card-body">
+              <p className="hint">No adapters reported yet. Start the backend to see live status.</p>
+            </div>
+          ) : (
+            <ul className="adapter-list">
+              {platformEntries.map(([key, p]) => (
+                <li key={key} className="adapter-row">
+                  <PlatformGlyph id={key} size="lg" />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div className="adapter-name">{p.name}</div>
+                    <div className="adapter-meta">
+                      {p.auth_info?.name ? p.auth_info.name : p.configured ? 'Authenticated' : 'Add credentials to .env'}
+                    </div>
+                  </div>
+                  <span className={`badge ${p.configured ? 'badge-ok' : ''}`}>
+                    <span className={`dot ${p.configured ? 'dot-ok' : 'dot-muted'}`} aria-hidden="true" />
+                    {p.configured ? 'Ready' : 'Optional'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
-    </div>
+    </>
   );
 };
